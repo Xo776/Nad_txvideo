@@ -11,4 +11,7 @@ host, info4.video.qq.com, reject
 host, info6.video.qq.com, reject
 host, otheve.beacon.qq.com, reject
 host, splashqqlive.gtimg.com, reject
+host-suffix, pangolin-sdk-toutiao.com, reject
+host-suffix, pglstatp-toutiao.com, reject
+host-suffix, iwan.qq.com, reject
 # shiply 含大量业务包，勿整域 reject；开屏/ams 走重写路径匹配
