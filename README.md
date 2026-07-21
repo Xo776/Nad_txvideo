@@ -1,12 +1,19 @@
-# 腾讯视频去广告 v3.0（对齐 Soul/byead 成功写法）
+# 腾讯视频去广告 v3.1（对齐 Soul/byead 成功写法）
 
-## 为什么之前没用
+## 信息流大卡（截图那种）
+
+电视剧频道中间「广告」+「去微信看看」来自：
+
+`i.video.qq.com` → `getMVLPageJ`，请求体带 `view_ad_ssp_*`
+
+v3.1 用 `qvideo_ivideo_req.js` 把 `view_ad_ssp` **等长**改成 `view_no_ssp`（不破坏 protobuf），思路同 Soul 信息流过滤。
+
+## 为什么之前 reject 没用
 
 Soul 线上仓库 [byead](https://github.com/Xo776/byead) 写明：
 
 > **`url reject-200` 对许多广告域名无效** → 统一用 `script-response-body` 返回 `{}`
 
-我们之前大量 `reject-200`，和 Soul 成功路径相反。
 
 ## QX 正确用法（必做）
 

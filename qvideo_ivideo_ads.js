@@ -1,7 +1,8 @@
 /**
- * i.video.qq.com — 广告 RPC 清空（非广告透传，对齐 Soul 对业务 JSON 的定点删除）
+ * i.video.qq.com 响应 — 纯广告 RPC 回 {}（对齐 Soul block）
+ * 信息流广告主要靠 qvideo_ivideo_req.js 去掉 view_ad_ssp
  */
-const AD = [
+const AD_RPC = [
   "GetSlotAdData",
   "Independent/GetAds",
   "ServerAdFeedsVideo",
@@ -23,10 +24,13 @@ const AD = [
   "AccessPromotion",
   "GetFloatActivity",
   "GetPromotionGlobalConfig",
-  "vinfoad"
+  "vinfoad",
+  "GetGameInfoV2",
+  "ChosenPageService",
+  "GetRecentGameSlip"
 ];
 
-function text() {
+function reqText() {
   try {
     if ($request.bodyBytes) {
       const u8 = new Uint8Array($request.bodyBytes);
@@ -39,10 +43,10 @@ function text() {
   return $request.body || "";
 }
 
-const t = text();
+const t = reqText();
 let hit = false;
-for (let i = 0; i < AD.length; i++) {
-  if (t.indexOf(AD[i]) !== -1) {
+for (let i = 0; i < AD_RPC.length; i++) {
+  if (t.indexOf(AD_RPC[i]) !== -1) {
     hit = true;
     break;
   }
