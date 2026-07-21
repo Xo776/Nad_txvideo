@@ -1,12 +1,11 @@
 /**
- * 腾讯视频 i.video.qq.com 广告 RPC 过滤（v1.4）
+ * 腾讯视频 i.video.qq.com 广告过滤（对齐 Soul 的 script-response-body 用法）
  *
- * script-response-body：广告 RPC 清空响应；非广告 $done({}) 不改二进制。
- * 目标：尽量让客户端拿不到广告位配置，减少「空广告框」。
+ * Soul：改 JSON 响应删 AD_* 字段
+ * Qvideo：请求体含广告 trpc 名时清空响应；否则 $done({}) 不动二进制业务包
  */
 
 const AD_MARKERS = [
-  // 激励 / SSP
   "reward_ad_ssp",
   "video_ad_ssp",
   "vip_ad_promotion",
@@ -21,28 +20,22 @@ const AD_MARKERS = [
   "AdPreGetAdvertisement",
   "PreGetAdvertisement",
   "AdResponseAdInfo",
-  "AdEmptyAdInfo",
   "VideoBoardAdConfig",
   "BatchPullBizAdInfos",
   "BatchPullDynamicVideoAdInfos",
   "BatchQueryBizAdInfos",
   "QueryUnlockModuleAdInfos",
   "QueryWelfareTaskAdInfo",
-  // 运营弹层 / 推广（占位来源之一）
   "AccessPromotion",
   "GetFloatActivity",
   "GetPromotionGlobalConfig",
   "promotion.adapter",
-  "vip_ad_promotion",
-  // 开屏
   "adsplash",
   "SplashAd",
   "AdSplash",
-  // 通用（protobuf / 业务字段）
   "QAdSplash",
   "QAdFeed",
   "QAdReward",
-  "qad_device",
   "vinfoad"
 ];
 
@@ -68,7 +61,7 @@ function isAd(text) {
 }
 
 if (isAd(reqText())) {
-  console.log("[qvideo-ad] empty ad RPC response");
+  console.log("[qvideo-ad] block ad rpc (soul-style response rewrite)");
   $done({ body: "", status: "HTTP/1.1 200 OK" });
 } else {
   $done({});
