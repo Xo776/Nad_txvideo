@@ -1,10 +1,8 @@
 /**
- * i.video 响应过滤 v4.4
+ * i.video 响应过滤 v4.5
  *
- * QUIC 已丢弃后开屏可消，若频道仍有「广告」大卡：
- * - 服务端仍可能在 getMVLPageJ 嵌 AdFeedInfo（仅改请求不够稳）
- * - 必须用 bodyBytes 等长破坏 protobuf Any 类型名
- * - 顺带清空独立广告 RPC（Float/激励/Slot）
+ * 223401（关重写）实锤：getMVLPageJ 解压后含 AdFeedInfo / 去微信看看 / pgdt
+ * 响应常 160–244KB。整包转 JS 字符串易在 QX 里超时/失败 → 改成 Uint8Array 原地等长替换。
  */
 const AD_RPC = [
   "GetSlotAdData",
@@ -32,7 +30,6 @@ const AD_RPC = [
   "ad_ssp_widget"
 ];
 
-// 等长替换：破坏 type.googleapis.com/.../Ad* 解析
 const PAIRS = [
   ["AdFeedInfo", "XxFeedInfo"],
   ["AdFeedImagePoster", "XxFeedImagePoster"],
@@ -51,7 +48,6 @@ const PAIRS = [
   ["InnerAdPullRefreshEventList", "InnerXxPullRefreshEventList"],
   ["InnerAdPullRefreshExtraDisplayInfo", "InnerXxPullRefreshExtraDisplayInfo"],
   ["InnerAdCommonPromotionEventActivityList", "InnerXxCommonPromotionEventActivityList"],
-  // 宽匹配：protocol.pb.AdXxx → protocol.pb.XdXxx
   ["protocol.pb.Ad", "protocol.pb.Xd"],
   ["pgdt.gtimg.cn", "xxxx.gtimg.cn"],
   ["native_ad_", "native_xx_"],
@@ -59,93 +55,124 @@ const PAIRS = [
   ["去微信看看", "\u3000\u3000\u3000\u3000\u3000"]
 ];
 
-function bytesToStr(buf) {
-  if (!buf) return "";
-  const u8 = buf instanceof ArrayBuffer ? new Uint8Array(buf) : new Uint8Array(buf);
-  const CHUNK = 0x8000;
-  let s = "";
-  for (let i = 0; i < u8.length; i += CHUNK) {
-    const sub = u8.subarray(i, Math.min(i + CHUNK, u8.length));
-    s += String.fromCharCode.apply(null, sub);
-  }
-  return s;
+function toU8(buf) {
+  if (!buf) return null;
+  return buf instanceof Uint8Array ? buf : new Uint8Array(buf);
 }
 
-function strToBytes(s) {
+function enc(s) {
   const u8 = new Uint8Array(s.length);
   for (let i = 0; i < s.length; i++) u8[i] = s.charCodeAt(i) & 0xff;
-  return u8.buffer;
+  return u8;
 }
 
-function reqStr() {
-  try {
-    if ($request.bodyBytes) return bytesToStr($request.bodyBytes);
-  } catch (e) {}
-  return $request.body || "";
+// UTF-8 encode for non-latin1 (去微信看看)
+function encUtf8(s) {
+  const bytes = [];
+  for (let i = 0; i < s.length; i++) {
+    let c = s.charCodeAt(i);
+    if (c < 0x80) bytes.push(c);
+    else if (c < 0x800) {
+      bytes.push(0xc0 | (c >> 6), 0x80 | (c & 0x3f));
+    } else {
+      bytes.push(0xe0 | (c >> 12), 0x80 | ((c >> 6) & 0x3f), 0x80 | (c & 0x3f));
+    }
+  }
+  return new Uint8Array(bytes);
 }
 
-function hasAdRpc(req) {
+function findBytes(hay, needle, from) {
+  const n = needle.length;
+  if (!n || hay.length < n) return -1;
+  outer: for (let i = from || 0; i <= hay.length - n; i++) {
+    for (let j = 0; j < n; j++) {
+      if (hay[i + j] !== needle[j]) continue outer;
+    }
+    return i;
+  }
+  return -1;
+}
+
+function containsStr(u8, s) {
+  return findBytes(u8, enc(s), 0) !== -1;
+}
+
+function replaceAllBytes(hay, fromStr, toStr) {
+  const useUtf8 = /[^\u0000-\u00ff]/.test(fromStr);
+  const a = useUtf8 ? encUtf8(fromStr) : enc(fromStr);
+  const b = useUtf8 ? encUtf8(toStr) : enc(toStr);
+  if (a.length !== b.length) return { u8: hay, changed: false };
+  let changed = false;
+  let i = 0;
+  while (true) {
+    const p = findBytes(hay, a, i);
+    if (p < 0) break;
+    hay.set(b, p);
+    changed = true;
+    i = p + b.length;
+  }
+  return { u8: hay, changed: changed };
+}
+
+function hasAdRpc(u8) {
+  if (!u8) return false;
   for (let i = 0; i < AD_RPC.length; i++) {
-    if (req.indexOf(AD_RPC[i]) !== -1) return true;
+    if (containsStr(u8, AD_RPC[i])) return true;
   }
   return false;
 }
 
-function needsStrip(body) {
+function needsStrip(u8) {
   return (
-    body.indexOf("AdFeed") !== -1 ||
-    body.indexOf("AdOpenWx") !== -1 ||
-    body.indexOf("InnerAd") !== -1 ||
-    body.indexOf("protocol.pb.Ad") !== -1 ||
-    body.indexOf("pgdt.gtimg.cn") !== -1 ||
-    body.indexOf("view_ad_ssp") !== -1 ||
-    body.indexOf("native_ad_") !== -1 ||
-    body.indexOf("去微信看看") !== -1
+    containsStr(u8, "AdFeed") ||
+    containsStr(u8, "AdOpenWx") ||
+    containsStr(u8, "InnerAd") ||
+    containsStr(u8, "protocol.pb.Ad") ||
+    containsStr(u8, "pgdt.gtimg.cn") ||
+    containsStr(u8, "view_ad_ssp") ||
+    containsStr(u8, "native_ad_") ||
+    findBytes(u8, encUtf8("去微信看看"), 0) !== -1
   );
 }
 
-function stripFeed(body) {
+function stripFeed(u8) {
   let changed = false;
   for (let i = 0; i < PAIRS.length; i++) {
-    const a = PAIRS[i][0];
-    const b = PAIRS[i][1];
-    if (a.length !== b.length) continue;
-    if (body.indexOf(a) !== -1) {
-      body = body.split(a).join(b);
-      changed = true;
-    }
+    const r = replaceAllBytes(u8, PAIRS[i][0], PAIRS[i][1]);
+    u8 = r.u8;
+    if (r.changed) changed = true;
   }
-  return { body: body, changed: changed };
+  return { u8: u8, changed: changed };
 }
 
-const req = reqStr();
-if (hasAdRpc(req)) {
+let reqU8 = null;
+try {
+  if ($request.bodyBytes) reqU8 = toU8($request.bodyBytes);
+} catch (e) {}
+if (!reqU8 && $request.body) reqU8 = enc($request.body);
+
+if (hasAdRpc(reqU8)) {
   $done({ body: "{}" });
 } else {
   let raw = null;
   try {
     raw = $response.bodyBytes;
   } catch (e) {}
-
-  if (raw) {
-    let body = bytesToStr(raw);
-    if (!needsStrip(body)) {
+  if (!raw) {
+    $done({});
+  } else {
+    let u8 = toU8(raw);
+    // 拷贝后再改，避免改坏只读缓冲
+    u8 = new Uint8Array(u8);
+    if (!needsStrip(u8)) {
       $done({});
     } else {
-      const r = stripFeed(body);
+      const r = stripFeed(u8);
       if (!r.changed) {
         $done({});
       } else {
-        $done({ bodyBytes: strToBytes(r.body) });
+        $done({ bodyBytes: r.u8.buffer });
       }
-    }
-  } else {
-    let body = $response.body || "";
-    if (!needsStrip(body)) {
-      $done({});
-    } else {
-      const r = stripFeed(body);
-      $done({ body: r.body });
     }
   }
 }
