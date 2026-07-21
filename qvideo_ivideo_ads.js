@@ -1,13 +1,12 @@
 /**
- * 腾讯视频 i.video.qq.com 广告 RPC 过滤（v1.2）
+ * 腾讯视频 i.video.qq.com 广告 RPC 过滤（v1.4）
  *
- * 使用 script-response-body（不是 analyze-echo + fetch）：
- * - 请求已正常到达源站，响应原样在 $response
- * - 仅当请求体含广告 trpc 名时清空响应
- * - 非广告：$done({}) 完全不改，避免破坏二进制 protobuf
+ * script-response-body：广告 RPC 清空响应；非广告 $done({}) 不改二进制。
+ * 目标：尽量让客户端拿不到广告位配置，减少「空广告框」。
  */
 
 const AD_MARKERS = [
+  // 激励 / SSP
   "reward_ad_ssp",
   "video_ad_ssp",
   "vip_ad_promotion",
@@ -18,18 +17,33 @@ const AD_MARKERS = [
   "RewardAdNewUpdate",
   "GetPersonalCenterAdData",
   "ServerAdFeedsVideo",
-  "AdPreGetAdvertisement",
   "Independent/GetAds",
+  "AdPreGetAdvertisement",
+  "PreGetAdvertisement",
+  "AdResponseAdInfo",
+  "AdEmptyAdInfo",
+  "VideoBoardAdConfig",
   "BatchPullBizAdInfos",
   "BatchPullDynamicVideoAdInfos",
   "BatchQueryBizAdInfos",
   "QueryUnlockModuleAdInfos",
   "QueryWelfareTaskAdInfo",
+  // 运营弹层 / 推广（占位来源之一）
   "AccessPromotion",
   "GetFloatActivity",
   "GetPromotionGlobalConfig",
+  "promotion.adapter",
+  "vip_ad_promotion",
+  // 开屏
   "adsplash",
-  "SplashAd"
+  "SplashAd",
+  "AdSplash",
+  // 通用（protobuf / 业务字段）
+  "QAdSplash",
+  "QAdFeed",
+  "QAdReward",
+  "qad_device",
+  "vinfoad"
 ];
 
 function reqText() {
@@ -54,7 +68,7 @@ function isAd(text) {
 }
 
 if (isAd(reqText())) {
-  console.log("[qvideo-ad] empty ad response on i.video.qq.com");
+  console.log("[qvideo-ad] empty ad RPC response");
   $done({ body: "", status: "HTTP/1.1 200 OK" });
 } else {
   $done({});
