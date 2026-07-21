@@ -1,19 +1,16 @@
-# 腾讯视频去广告 v3.1（对齐 Soul/byead 成功写法）
+# 腾讯视频去广告 v4.0
 
-## 信息流大卡（截图那种）
+## 深挖更正（重要）
 
-电视剧频道中间「广告」+「去微信看看」来自：
+频道信息流「广告」大卡**不是**改请求就能去掉的。
 
-`i.video.qq.com` → `getMVLPageJ`，请求体带 `view_ad_ssp_*`
+正确解压 `getMVLPageJ` 响应（chunked→gzip）后可见：
 
-v3.1 用 `qvideo_ivideo_req.js` 把 `view_ad_ssp` **等长**改成 `view_no_ssp`（不破坏 protobuf），思路同 Soul 信息流过滤。
+- `AdFeedInfo` / `AdOpenWxProgramAction`
+- 「超能下蛋鸭」「去微信看看」「广告」
+- `pgdt.gtimg.cn` 素材
 
-## 为什么之前 reject 没用
-
-Soul 线上仓库 [byead](https://github.com/Xo776/byead) 写明：
-
-> **`url reject-200` 对许多广告域名无效** → 统一用 `script-response-body` 返回 `{}`
-
+v4.0：在 **响应**里等长破坏这些广告类型名。
 
 ## QX 正确用法（必做）
 
