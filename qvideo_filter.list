@@ -1,6 +1,8 @@
-# 腾讯视频广告域名分流（可选，与重写双保险）
-# QX：设置 → 分流 → 引用 → 添加本文件 raw 链接，策略选 reject
-# 不依赖 MitM，按主机名直接拦截连接
+# 腾讯视频广告域名分流（不依赖 MitM / 不依赖抓包）
+# QX：分流 → 引用 → 本文件，策略选 reject
+#
+# 说明：QUIC 绕过时，只有「分流 reject」仍能拦纯广告域；
+# 业务域 i.video / svv 不能整域 reject，必须靠丢弃 QUIC + MitM 重写
 
 host-suffix, l.qq.com, reject
 host, pgdt.gtimg.cn, reject
@@ -14,4 +16,6 @@ host, splashqqlive.gtimg.com, reject
 host-suffix, pangolin-sdk-toutiao.com, reject
 host-suffix, pglstatp-toutiao.com, reject
 host-suffix, iwan.qq.com, reject
-# shiply 含大量业务包，勿整域 reject；开屏/ams 走重写路径匹配
+host, iwan.video.qq.com, reject
+# 开屏素材域（hostname 级；shiply-cdn 混业务不能整域 reject，靠丢弃 QUIC + 重写路径）
+host-keyword, splashqqlive, reject

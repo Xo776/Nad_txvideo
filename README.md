@@ -1,82 +1,71 @@
-# 腾讯视频去广告 v4.0
+# 腾讯视频去广告 — 抓包开/关现象说明（必读）
 
-## 深挖更正（重要）
+## 你观察到的现象
 
-频道信息流「广告」大卡**不是**改请求就能去掉的。
+| 状态 | 开屏 / 信息流广告 |
+|------|-------------------|
+| 打开 QX「HTTP 抓包」 | 广告消失 |
+| 关闭抓包 | 开屏和广告又回来 |
 
-正确解压 `getMVLPageJ` 响应（chunked→gzip）后可见：
+**这不是规则写错，而是平时流量没进 MitM。**
 
-- `AdFeedInfo` / `AdOpenWxProgramAction`
-- 「超能下蛋鸭」「去微信看看」「广告」
-- `pgdt.gtimg.cn` 素材
+## 原因：QUIC 绕过
 
-v4.0：在 **响应**里等长破坏这些广告类型名。
+1. 腾讯视频响应里有 `alt-svc: quic=":443"`，会优先 HTTP/3（UDP）
+2. QX 的 **重写 / script-response-body 只能改 TCP 上的 HTTPS（MitM）**
+3. 开抓包时，流量被强制抓成可解密的 HTTPS → 规则生效  
+4. 关抓包后，App 走 QUIC → **脚本、hostname MitM 全部碰不到** → 广告全回来
 
-## QX 正确用法（必做）
+Soul 等 App 若不走 QUIC，就不会有这个问题。
 
-### A. 重写（必须）
+## 必做三步（关抓包也要去广告）
 
-1. 风车 → **重写** → **规则资源 / 引用**
-2. 删除旧的腾讯视频引用
-3. 新增：
-   ```
-   https://raw.githubusercontent.com/Xo776/Nad_txvideo/main/qvideo_ads.conf
-   ```
-4. 保存后对该资源 **右滑 → 更新**（必须看到更新成功）
-5. 确认该引用 **已勾选启用**
+### 1）丢弃 QUIC（关键）
 
-### B. MitM（改 HTTPS body 必须）
+编辑 QX 配置文件 `[general]`，加入：
 
-1. 风车 → **MitM** → 生成并安装证书 → **系统设置里信任证书**
-2. 打开 **MitM 总开关**
-3. 主机名应自动带上 `svv.video.qq.com`、`*.l.qq.com`、`i.video.qq.com` 等  
-   （若没有：手动加 `svv.video.qq.com, vv.video.qq.com, *.l.qq.com, i.video.qq.com`）
+```text
+udp_drop_list=443, QUIC
+```
 
-### C. 分流（推荐双保险）
+或引用仓库里的说明文件：`qvideo_quic.conf`（把其中 `[general]` 那一行拷进你的配置）。
 
-1. 风车 → **分流** → **引用**
-2. 添加：
-   ```
-   https://raw.githubusercontent.com/Xo776/Nad_txvideo/main/qvideo_filter.list
-   ```
-3. 策略选 **reject**，启用并更新
+保存后 **不要开抓包**，强杀腾讯视频再开。
 
-### D. 清缓存（同 Soul 说明）
+### 2）MitM 常开（不要只靠抓包）
 
-> 规则生效后如仍有残留，**卸载腾讯视频重装**后冷启。
+- MitM 总开关：**开**
+- 证书已信任
+- 主机名含：`i.video.qq.com`, `svv.video.qq.com`, `*.l.qq.com`, `*.shiply-cdn.qq.com`, `pgdt.gtimg.cn` 等  
+  （引用 `qvideo_ads.conf` 后应自动合并）
 
-强杀不够时，本地开屏/贴片缓存仍在。
+### 3）分流 reject（不依赖 MitM）
 
-## 对照 Soul
+引用并启用：
 
-| Soul (byead) | 腾讯视频 v3 |
-|--------------|-------------|
-| `soul_block.js` → `{}` | `qvideo_block.js` → `{}` |
-| `soul_popup_ads.js` 删 JSON 字段 | `qvideo_getvinfo_resp.js` 清 `adpass` |
-| 远程 raw + hostname | 同左 |
-| 残留则重装 App | 同左 |
+```text
+https://raw.githubusercontent.com/Xo776/Nad_txvideo/main/qvideo_filter.list
+```
 
-## 自检
+策略选 **reject**。  
+可拦 GDT / L 域 / iwan / splash 域名；**拦不住**必须改 body 的 `i.video` 信息流（所以仍要步骤 1）。
 
-播一集时看 QX 日志：
+## 重写（改 body）
 
-1. `getvinfo` 是否命中重写 / 脚本  
-2. 请求体是否出现 `sppreviewtype=0`  
-3. `vi.l.qq.com` 是否被脚本处理  
+```text
+https://raw.githubusercontent.com/Xo776/Nad_txvideo/main/qvideo_ads.conf
+```
 
-若日志完全没有 `svv.video.qq.com` 的脚本记录 → MitM/重写未生效，不是规则内容问题。
+右滑更新并勾选。
 
-## 文件
+## 如何自检「是不是又在走 QUIC」
 
-| 文件 | 作用 |
-|------|------|
-| `qvideo_ads.conf` | 重写（主） |
-| `qvideo_filter.list` | 分流 reject（辅） |
-| `qvideo_block.js` | 空 JSON |
-| `qvideo_getvinfo.js` / `_resp.js` | 贴片 |
-| `qvideo_vmind.js` | 中插 XML |
-| `qvideo_ivideo_ads.js` | 广告 RPC |
+关抓包、开着去广告规则，冷启腾讯视频：
 
-## 许可证
+- 若开屏/信息流又回来 → 多半 `udp_drop_list` 没生效，检查 `[general]`  
+- 若仍干净 → QUIC 已打掉，MitM 正常
 
-MIT
+## 我们还没「漏掉的广告接口」？
+
+在 **抓包模式下** 已能去掉信息流大卡（AdFeedInfo）和贴片开关，说明接口找得差不多。  
+关抓包又回来，优先是 **通道问题（QUIC）**，不是又有一条未知域名。
