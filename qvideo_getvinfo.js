@@ -1,7 +1,5 @@
 /**
- * 腾讯视频 getvinfo — 关闭贴片开关
- * 抓包：svv.video.qq.com/getvinfo POST 含 sppreviewtype=1 / spsrt / spadseg
- * 仅挂 script-request-body（同一 URL 不可再挂第二条重写）
+ * getvinfo 请求：关贴片参数（备用；优先用 conf 里原生 request-body）
  */
 function fix(s) {
   if (!s) return s;

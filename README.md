@@ -1,40 +1,29 @@
-# 腾讯视频去广告 v2.0（推倒重来）
+# 腾讯视频去广告 v2.1
 
-## 客户端结论
+## 19:55 抓包结论（`2026-07-21-192707`）
 
-| 组件 | 说明 |
-|------|------|
-| `QADSplashSDK` / `QADFeedSDK` / `QADRewardSDK` | 资源包；逻辑在主程序 `live4iphoneRel` |
-| `com.tencent.qadsdk` | 广告 SDK 编进主二进制 |
-| `TAD*` / `QADJSTools.js` | H5 广告辅助 |
-| 明文 host | `news/lives/p.l.qq.com`、`pgdt.gtimg.cn`、`t.gdt.qq.com`、`vv.../getvmind` |
-| 广告位 RPC | **`GetSlotAdData`**、`Independent/GetAds`（右上角「广告」） |
+| 时间 | 请求 | 含义 |
+|------|------|------|
+| 19:55:01 #1395 | `svv.video.qq.com/getvinfo` POST 仍 `sppreviewtype=1` | **请求改写未生效** |
+| 同响应 | `vl.vi[0].adpass` → `noBanner:false` + `.l.qq.com` Cookie | 客户端 `decodeAdPassStr` 续拉广告 |
+| 随后 | `puui.../media_img/lena/...` | 广告创意图 |
+| 同时段 | `vi.l.qq.com/proxyhttp` `buid=onlyad\|vinfoad` | L 域广告代理 |
+| | `vv.../getvmind` 已 200 空体 | vmind 拦截有效，但不够 |
 
-## 抓包结论
+客户端二进制：`QAdTvCastAdPass` / `decodeAdPassStr`；广告位 RPC `GetSlotAdData`。
 
-`svv.video.qq.com/getvinfo` POST：`sppreviewtype=1` → 贴片开启。
+## v2.1 改动
 
-## 旧版为何失败
+1. **原生** `request-body` 把 `sppreviewtype/spsrt/spadseg` 改为 0（对齐社区，不靠远程 JS 改请求）
+2. **响应脚本** 清空 `adpass`（`noBanner:true`）
+3. 拦 `media_img/lena`、`ams_` Shiply
 
-同一 `getvinfo` URL 挂了 **body + header 两条脚本**，QX 同一请求只跑一条，贴片开关经常没改到。
-
-## 安装（同 Soul）
+## 安装
 
 ```
 https://raw.githubusercontent.com/Xo776/Nad_txvideo/main/qvideo_ads.conf
 ```
 
-1. 删掉旧的腾讯视频重写引用，重新添加上面链接  
-2. 开启 MitM / 重写  
-3. **清腾讯视频缓存或重装**后冷启（清本地开屏缓存）  
-4. 强杀再播一集验证贴片  
+删掉旧重写 → 重新订阅 → **更新资源** → 确认 MitM 含 `svv.video.qq.com` → **清 App 缓存或重装** → 强杀冷启 → 播一集。
 
-## 文件
-
-- `qvideo_ads.conf`
-- `qvideo_getvinfo.js` — 关贴片  
-- `qvideo_ivideo_ads.js` — 清广告位 RPC  
-
-## 许可证
-
-MIT
+若贴片仍在：在 QX 日志里搜 `getvinfo`，看请求体是否已是 `sppreviewtype=0`。
