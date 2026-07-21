@@ -1,45 +1,42 @@
-# 腾讯视频 (Qvideo) AdBlock
+# 腾讯视频 AdBlock v1.7
 
-对齐 **Soul / byead** 的 Quantumult X 写法。
+## 客户端深挖结论（为何「所有广告都还在」）
 
-## 和 Soul 一样怎么装
+外围域 reject + 锁 puui **挡不住贴片**。抓包实锤：
 
-| 文件 | 用途 |
-|------|------|
-| `qvideo_ads.conf` | 重写配置（导入 QX 引用） |
-| `qvideo_ivideo_ads.js` | 响应过滤脚本（GitHub raw，由 conf 引用） |
+| 链路 | 端点 | 关键字段 |
+|------|------|----------|
+| 正片信息 | `svv.video.qq.com/getvinfo` POST | **`sppreviewtype=1`** 打开贴片 |
+| 中插清单 | `vv.video.qq.com/getvmind` | 广告 XML |
+| 开屏/信息流 | `*.l.qq.com` / Shiply splash / QAD | 独立域 |
+| 角标广告位 | `i.video.qq.com` trpc | 业务混排 |
 
-### 1. 已托管（同 Soul 的 byead）
+社区成熟做法（Surge/Loon）：把 `sppreviewtype` / `spsrt` 改成 `0`。v1.7 已照做。
 
+IPA 另补：`pgdt.gtimg.cn`、`gdtimg.com`、`info4/6.video.qq.com`、`beacon` 等。
+
+## 安装（同 Soul）
+
+重写引用：
 ```
-https://raw.githubusercontent.com/Xo776/Nad_txvideo/main/qvideo_ivideo_ads.js
 https://raw.githubusercontent.com/Xo776/Nad_txvideo/main/qvideo_ads.conf
 ```
 
-### 2. 导入 Quantumult X
+脚本（conf 已写 raw，无需本地拷贝）：
+- `qvideo_getvinfo.js` — 改 POST body  
+- `qvideo_getvinfo_url.js` — 改 GET query  
+- `qvideo_ivideo_ads.js` — 清 i.video 广告 RPC  
 
-1. 重写 → 引用 → 添加 `qvideo_ads.conf` 的 raw 链接  
-2. 开启 MitM（conf 末尾已带 hostname）  
-3. 开启「重写」  
+更新后请：**强杀腾讯视频**，播一集看前贴是否还在。开屏若仍闪，清 App 缓存再冷启。
 
-### 3. 验证
+## 文件
 
-强杀腾讯视频后冷启；开屏应减少。右上角「广告」角标依赖 L2 脚本生效。
-
-## 策略对照 Soul
-
-| | Soul | Qvideo |
-|--|------|--------|
-| 独立广告域 | `reject-200` | 同左（`*.l.qq.com` / GDT / vmind / puui…） |
-| 要改响应的接口 | `script-response-body` + raw JS | 同左（仅 `i.video.qq.com`） |
-| 不用 | — | **不用** `script-echo-response`（易失效） |
-
-Soul 广告域独立，整路径 reject 就够。  
-腾讯视频大量广告挤在 `i.video.qq.com`，所以多一层「按 trpc 名清空响应」。
-
-## 开屏又出现时
-
-清腾讯视频缓存或重装后再冷启（Shiply 开屏包可能已本地缓存）。
+| 文件 | 作用 |
+|------|------|
+| `qvideo_ads.conf` | 重写总表 |
+| `qvideo_getvinfo.js` | 关贴片开关 |
+| `qvideo_getvinfo_url.js` | GET 版关贴片 |
+| `qvideo_ivideo_ads.js` | 网关广告 RPC |
 
 ## 许可证
 
