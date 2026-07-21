@@ -1,9 +1,10 @@
 # 腾讯视频广告域名分流（不依赖 MitM / 不依赖抓包）
 # QX：分流 → 引用 → 本文件，策略选 reject
 #
-# 说明：QUIC 绕过时，只有「分流 reject」仍能拦纯广告域；
-# 业务域 i.video / svv 不能整域 reject，必须靠丢弃 QUIC + MitM 重写
+# v4.9 实验：host i.video.qq.com reject（与重写整域 reject 双保险）
+# 若频道/信息流挂了：删掉下面那一行 i.video，并让重写订阅回退脚本改写
 
+host, i.video.qq.com, reject
 host-suffix, l.qq.com, reject
 host, pgdt.gtimg.cn, reject
 host-suffix, gdtimg.com, reject
