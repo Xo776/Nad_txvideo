@@ -1,0 +1,14 @@
+# 腾讯视频广告域名分流（可选，与重写双保险）
+# QX：设置 → 分流 → 引用 → 添加本文件 raw 链接，策略选 reject
+# 不依赖 MitM，按主机名直接拦截连接
+
+host-suffix, l.qq.com, reject
+host, pgdt.gtimg.cn, reject
+host-suffix, gdtimg.com, reject
+host-suffix, gdt.qq.com, reject
+host, sdkreport.e.qq.com, reject
+host, info4.video.qq.com, reject
+host, info6.video.qq.com, reject
+host, otheve.beacon.qq.com, reject
+host, splashqqlive.gtimg.com, reject
+# shiply 含大量业务包，勿整域 reject；开屏/ams 走重写路径匹配

@@ -1,29 +1,78 @@
-# 腾讯视频去广告 v2.1
+# 腾讯视频去广告 v3.0（对齐 Soul/byead 成功写法）
 
-## 19:55 抓包结论（`2026-07-21-192707`）
+## 为什么之前没用
 
-| 时间 | 请求 | 含义 |
-|------|------|------|
-| 19:55:01 #1395 | `svv.video.qq.com/getvinfo` POST 仍 `sppreviewtype=1` | **请求改写未生效** |
-| 同响应 | `vl.vi[0].adpass` → `noBanner:false` + `.l.qq.com` Cookie | 客户端 `decodeAdPassStr` 续拉广告 |
-| 随后 | `puui.../media_img/lena/...` | 广告创意图 |
-| 同时段 | `vi.l.qq.com/proxyhttp` `buid=onlyad\|vinfoad` | L 域广告代理 |
-| | `vv.../getvmind` 已 200 空体 | vmind 拦截有效，但不够 |
+Soul 线上仓库 [byead](https://github.com/Xo776/byead) 写明：
 
-客户端二进制：`QAdTvCastAdPass` / `decodeAdPassStr`；广告位 RPC `GetSlotAdData`。
+> **`url reject-200` 对许多广告域名无效** → 统一用 `script-response-body` 返回 `{}`
 
-## v2.1 改动
+我们之前大量 `reject-200`，和 Soul 成功路径相反。
 
-1. **原生** `request-body` 把 `sppreviewtype/spsrt/spadseg` 改为 0（对齐社区，不靠远程 JS 改请求）
-2. **响应脚本** 清空 `adpass`（`noBanner:true`）
-3. 拦 `media_img/lena`、`ams_` Shiply
+## QX 正确用法（必做）
 
-## 安装
+### A. 重写（必须）
 
-```
-https://raw.githubusercontent.com/Xo776/Nad_txvideo/main/qvideo_ads.conf
-```
+1. 风车 → **重写** → **规则资源 / 引用**
+2. 删除旧的腾讯视频引用
+3. 新增：
+   ```
+   https://raw.githubusercontent.com/Xo776/Nad_txvideo/main/qvideo_ads.conf
+   ```
+4. 保存后对该资源 **右滑 → 更新**（必须看到更新成功）
+5. 确认该引用 **已勾选启用**
 
-删掉旧重写 → 重新订阅 → **更新资源** → 确认 MitM 含 `svv.video.qq.com` → **清 App 缓存或重装** → 强杀冷启 → 播一集。
+### B. MitM（改 HTTPS body 必须）
 
-若贴片仍在：在 QX 日志里搜 `getvinfo`，看请求体是否已是 `sppreviewtype=0`。
+1. 风车 → **MitM** → 生成并安装证书 → **系统设置里信任证书**
+2. 打开 **MitM 总开关**
+3. 主机名应自动带上 `svv.video.qq.com`、`*.l.qq.com`、`i.video.qq.com` 等  
+   （若没有：手动加 `svv.video.qq.com, vv.video.qq.com, *.l.qq.com, i.video.qq.com`）
+
+### C. 分流（推荐双保险）
+
+1. 风车 → **分流** → **引用**
+2. 添加：
+   ```
+   https://raw.githubusercontent.com/Xo776/Nad_txvideo/main/qvideo_filter.list
+   ```
+3. 策略选 **reject**，启用并更新
+
+### D. 清缓存（同 Soul 说明）
+
+> 规则生效后如仍有残留，**卸载腾讯视频重装**后冷启。
+
+强杀不够时，本地开屏/贴片缓存仍在。
+
+## 对照 Soul
+
+| Soul (byead) | 腾讯视频 v3 |
+|--------------|-------------|
+| `soul_block.js` → `{}` | `qvideo_block.js` → `{}` |
+| `soul_popup_ads.js` 删 JSON 字段 | `qvideo_getvinfo_resp.js` 清 `adpass` |
+| 远程 raw + hostname | 同左 |
+| 残留则重装 App | 同左 |
+
+## 自检
+
+播一集时看 QX 日志：
+
+1. `getvinfo` 是否命中重写 / 脚本  
+2. 请求体是否出现 `sppreviewtype=0`  
+3. `vi.l.qq.com` 是否被脚本处理  
+
+若日志完全没有 `svv.video.qq.com` 的脚本记录 → MitM/重写未生效，不是规则内容问题。
+
+## 文件
+
+| 文件 | 作用 |
+|------|------|
+| `qvideo_ads.conf` | 重写（主） |
+| `qvideo_filter.list` | 分流 reject（辅） |
+| `qvideo_block.js` | 空 JSON |
+| `qvideo_getvinfo.js` / `_resp.js` | 贴片 |
+| `qvideo_vmind.js` | 中插 XML |
+| `qvideo_ivideo_ads.js` | 广告 RPC |
+
+## 许可证
+
+MIT

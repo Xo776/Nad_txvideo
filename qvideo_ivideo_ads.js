@@ -1,24 +1,19 @@
 /**
- * 腾讯视频 i.video.qq.com — 清空广告 RPC 响应
- * 客户端二进制可见：GetSlotAdData / GetAds / reward_ad_ssp / Splash 等
- * Soul 同款：script-response-body + 远程 raw；非广告 $done({})
+ * i.video.qq.com — 广告 RPC 清空（非广告透传，对齐 Soul 对业务 JSON 的定点删除）
  */
 const AD = [
-  // 广告位（右上角「广告」角标来源）
   "GetSlotAdData",
   "Independent/GetAds",
   "ServerAdFeedsVideo",
   "GetPersonalCenterAdData",
   "GetSpeedPanelAd",
   "video_ad_ssp",
-  // 激励
   "reward_ad_ssp",
   "RewardAdNewPlay",
   "RewardAdNewUpdate",
   "GetFollowHeartRewardAdInfo",
   "GetRewardEntranceInfo",
   "GetRewardPendant",
-  // 开屏 / 推广
   "AdPreGetAdvertisement",
   "SplashAd",
   "adsplash",
@@ -53,7 +48,7 @@ for (let i = 0; i < AD.length; i++) {
   }
 }
 if (hit) {
-  $done({ body: "", status: "HTTP/1.1 200 OK" });
+  $done({ body: "{}" });
 } else {
   $done({});
 }
