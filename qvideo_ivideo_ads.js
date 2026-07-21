@@ -1,11 +1,11 @@
 /**
- * i.video.qq.com 响应 — 纯广告 RPC 回 {}（对齐 Soul block）
- * 信息流广告主要靠 qvideo_ivideo_req.js 去掉 view_ad_ssp
+ * i.video 响应：广告 RPC 回 {}；并识别请求里已改名的广告上下文
  */
 const AD_RPC = [
   "GetSlotAdData",
   "Independent/GetAds",
   "ServerAdFeedsVideo",
+  "video_ad_ssp_feeds",
   "GetPersonalCenterAdData",
   "GetSpeedPanelAd",
   "video_ad_ssp",
@@ -27,7 +27,9 @@ const AD_RPC = [
   "vinfoad",
   "GetGameInfoV2",
   "ChosenPageService",
-  "GetRecentGameSlip"
+  "GetRecentGameSlip",
+  "AdRequestContextInfo",
+  "NoRequestContextInfo"
 ];
 
 function reqText() {
@@ -47,6 +49,13 @@ const t = reqText();
 let hit = false;
 for (let i = 0; i < AD_RPC.length; i++) {
   if (t.indexOf(AD_RPC[i]) !== -1) {
+    // 仅 AdRequestContextInfo / NoRequest... 出现在 MVL 频道请求里：不能整包清空，否则频道空白
+    if (
+      AD_RPC[i] === "AdRequestContextInfo" ||
+      AD_RPC[i] === "NoRequestContextInfo"
+    ) {
+      continue;
+    }
     hit = true;
     break;
   }
