@@ -1,10 +1,12 @@
 /**
- * i.video 响应过滤 v4.1（对照 19:55 #1503 超能下蛋鸭）
+ * i.video 响应过滤 v4.2
  *
- * 关键因：protobuf 含大量 0x00，用 $response.body 字符串会截断，
- * 导致找不到 AdFeedInfo。必须只用 bodyBytes。
- *
- * #1503 解压后含 3 个 AdFeedInfo Module + AdOpenWxProgramAction +「去微信看看」
+ * 对照抓包 2026-07-21-195538：
+ * - 请求改写已生效（NoRequestContextInfo）
+ * - AdFeedInfo / 超能下蛋鸭 已从 MVL 消失
+ * - 但 GetFloatActivity / AccessPromotion / reward 仍有回包
+ *   原因：AD_RPC 命中后 $done("{}") 未结束，后面又 $done({}) 透传覆盖
+ * - 残留 InnerAd* 推广事件需一并破坏
  */
 const AD_RPC = [
   "GetSlotAdData",
@@ -25,7 +27,8 @@ const AD_RPC = [
   "GetPromotionGlobalConfig",
   "vinfoad",
   "GetGameInfoV2",
-  "ChosenPageService"
+  "ChosenPageService",
+  "GetRecentGameSlip"
 ];
 
 const PAIRS = [
@@ -40,7 +43,8 @@ const PAIRS = [
   ["AdWebAction", "XxWebAction"],
   ["InnerAdPromotionEventList", "InnerXxPromotionEventList"],
   ["InnerAdPullRefreshEventList", "InnerXxPullRefreshEventList"],
-  ["InnerAdPullRefreshExtraDisplayInfo", "InnerXxPullRefreshExtraDisplayInfo"]
+  ["InnerAdPullRefreshExtraDisplayInfo", "InnerXxPullRefreshExtraDisplayInfo"],
+  ["InnerAdCommonPromotionEventActivityList", "InnerXxCommonPromotionEventActivityList"]
 ];
 
 function bytesToStr(buf) {
@@ -68,49 +72,69 @@ function reqStr() {
   return $request.body || "";
 }
 
-const req = reqStr();
-for (let i = 0; i < AD_RPC.length; i++) {
-  if (req.indexOf(AD_RPC[i]) !== -1) {
-    $done({ body: "{}" });
+function hasAdRpc(req) {
+  for (let i = 0; i < AD_RPC.length; i++) {
+    if (req.indexOf(AD_RPC[i]) !== -1) return true;
   }
+  return false;
 }
 
-let raw;
-try {
-  raw = $response.bodyBytes;
-} catch (e) {
-  raw = null;
-}
-
-if (!raw) {
-  // 无 bodyBytes 时尽量用 body（可能已截断，仍尝试）
-  let body = $response.body || "";
-  if (body.indexOf("AdFeedInfo") === -1) {
-    $done({});
-  } else {
-    for (let i = 0; i < PAIRS.length; i++) {
-      const a = PAIRS[i][0];
-      const b = PAIRS[i][1];
-      if (a.length === b.length) body = body.split(a).join(b);
+function stripFeed(body) {
+  let changed = false;
+  for (let i = 0; i < PAIRS.length; i++) {
+    const a = PAIRS[i][0];
+    const b = PAIRS[i][1];
+    if (a.length !== b.length) continue;
+    if (body.indexOf(a) !== -1) {
+      body = body.split(a).join(b);
+      changed = true;
     }
-    $done({ body: body });
   }
-} else {
-  let body = bytesToStr(raw);
-  if (body.indexOf("AdFeedInfo") === -1 && body.indexOf("AdOpenWxProgramAction") === -1) {
-    $done({});
-  } else {
-    for (let i = 0; i < PAIRS.length; i++) {
-      const a = PAIRS[i][0];
-      const b = PAIRS[i][1];
-      if (a.length !== b.length) continue;
-      if (body.indexOf(a) !== -1) body = body.split(a).join(b);
-    }
-    // 19:55 明文 CTA / 角标（UTF-8 等长）
-    body = body.split("广告").join("\u3000\u3000");
-    // 去微信看看 = 15 bytes；看详情内容　 = 需 15 bytes
-    // 去微信看看: 5*3=15；　　　　　　　 = 5*3=15 全角空格
+  if (body.indexOf("去微信看看") !== -1) {
     body = body.split("去微信看看").join("\u3000\u3000\u3000\u3000\u3000");
-    $done({ bodyBytes: strToBytes(body) });
+    changed = true;
+  }
+  return { body: body, changed: changed };
+}
+
+function needsStrip(body) {
+  return (
+    body.indexOf("AdFeedInfo") !== -1 ||
+    body.indexOf("AdOpenWxProgramAction") !== -1 ||
+    body.indexOf("InnerAdPromotion") !== -1 ||
+    body.indexOf("InnerAdPullRefresh") !== -1 ||
+    body.indexOf("InnerAdCommonPromotion") !== -1
+  );
+}
+
+const req = reqStr();
+if (hasAdRpc(req)) {
+  $done({ body: "{}" });
+} else {
+  let raw = null;
+  try {
+    raw = $response.bodyBytes;
+  } catch (e) {}
+
+  if (raw) {
+    let body = bytesToStr(raw);
+    if (!needsStrip(body)) {
+      $done({});
+    } else {
+      const r = stripFeed(body);
+      if (!r.changed) {
+        $done({});
+      } else {
+        $done({ bodyBytes: strToBytes(r.body) });
+      }
+    }
+  } else {
+    let body = $response.body || "";
+    if (!needsStrip(body)) {
+      $done({});
+    } else {
+      const r = stripFeed(body);
+      $done({ body: r.body });
+    }
   }
 }
