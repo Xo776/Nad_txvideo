@@ -1,23 +1,13 @@
 /**
- * 腾讯视频 getvinfo 去贴片参数（对齐社区成熟写法）
- *
- * 抓包证实 svv.video.qq.com/getvinfo POST body 含：
- *   sppreviewtype=1  → 开启前贴/预览广告
- *   spsrt=3
- *   spadseg=3
- * 改为 0 后播放器不再拉贴片广告清单。
- *
- * 挂载类型：script-request-body（Soul 同款远程 raw）
+ * 腾讯视频 getvinfo — 关闭贴片开关
+ * 抓包：svv.video.qq.com/getvinfo POST 含 sppreviewtype=1 / spsrt / spadseg
+ * 仅挂 script-request-body（同一 URL 不可再挂第二条重写）
  */
-
-function zeroAdParams(s) {
+function fix(s) {
   if (!s) return s;
-  s = s.replace(/sppreviewtype=\d+/gi, "sppreviewtype=0");
-  s = s.replace(/spsrt=\d+/gi, "spsrt=0");
-  s = s.replace(/spadseg=\d+/gi, "spadseg=0");
-  return s;
+  return s
+    .replace(/sppreviewtype=\d+/gi, "sppreviewtype=0")
+    .replace(/spsrt=\d+/gi, "spsrt=0")
+    .replace(/spadseg=\d+/gi, "spadseg=0");
 }
-
-let body = $request.body || "";
-body = zeroAdParams(body);
-$done({ body });
+$done({ body: fix($request.body || "") });

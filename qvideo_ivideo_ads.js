@@ -1,47 +1,39 @@
 /**
- * 腾讯视频 i.video.qq.com 广告过滤（对齐 Soul 的 script-response-body 用法）
- *
- * Soul：改 JSON 响应删 AD_* 字段
- * Qvideo：请求体含广告 trpc 名时清空响应；否则 $done({}) 不动二进制业务包
+ * 腾讯视频 i.video.qq.com — 清空广告 RPC 响应
+ * 客户端二进制可见：GetSlotAdData / GetAds / reward_ad_ssp / Splash 等
+ * Soul 同款：script-response-body + 远程 raw；非广告 $done({})
  */
-
-const AD_MARKERS = [
-  "reward_ad_ssp",
+const AD = [
+  // 广告位（右上角「广告」角标来源）
+  "GetSlotAdData",
+  "Independent/GetAds",
+  "ServerAdFeedsVideo",
+  "GetPersonalCenterAdData",
+  "GetSpeedPanelAd",
   "video_ad_ssp",
-  "vip_ad_promotion",
+  // 激励
+  "reward_ad_ssp",
+  "RewardAdNewPlay",
+  "RewardAdNewUpdate",
   "GetFollowHeartRewardAdInfo",
   "GetRewardEntranceInfo",
   "GetRewardPendant",
-  "RewardAdNewPlay",
-  "RewardAdNewUpdate",
-  "GetPersonalCenterAdData",
-  "ServerAdFeedsVideo",
-  "Independent/GetAds",
+  // 开屏 / 推广
   "AdPreGetAdvertisement",
-  "PreGetAdvertisement",
-  "AdResponseAdInfo",
-  "VideoBoardAdConfig",
-  "BatchPullBizAdInfos",
-  "BatchPullDynamicVideoAdInfos",
-  "BatchQueryBizAdInfos",
-  "QueryUnlockModuleAdInfos",
-  "QueryWelfareTaskAdInfo",
+  "SplashAd",
+  "adsplash",
+  "AdSplash",
+  "QAdSplash",
+  "vip_ad_promotion",
   "AccessPromotion",
   "GetFloatActivity",
   "GetPromotionGlobalConfig",
-  "promotion.adapter",
-  "adsplash",
-  "SplashAd",
-  "AdSplash",
-  "QAdSplash",
-  "QAdFeed",
-  "QAdReward",
   "vinfoad"
 ];
 
-function reqText() {
+function text() {
   try {
-    if (typeof $request.bodyBytes !== "undefined" && $request.bodyBytes) {
+    if ($request.bodyBytes) {
       const u8 = new Uint8Array($request.bodyBytes);
       const n = Math.min(u8.length, 65536);
       let s = "";
@@ -52,16 +44,15 @@ function reqText() {
   return $request.body || "";
 }
 
-function isAd(text) {
-  if (!text) return false;
-  for (let i = 0; i < AD_MARKERS.length; i++) {
-    if (text.indexOf(AD_MARKERS[i]) !== -1) return true;
+const t = text();
+let hit = false;
+for (let i = 0; i < AD.length; i++) {
+  if (t.indexOf(AD[i]) !== -1) {
+    hit = true;
+    break;
   }
-  return false;
 }
-
-if (isAd(reqText())) {
-  console.log("[qvideo-ad] block ad rpc (soul-style response rewrite)");
+if (hit) {
   $done({ body: "", status: "HTTP/1.1 200 OK" });
 } else {
   $done({});
